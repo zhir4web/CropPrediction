@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crop Analytics Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+  <aside class="sidebar">
+    <div class="logo-area">
+      <h2>CropAI Admin</h2>
+    </div>
+    <ul class="nav-links">
+      <li class="nav-item">
+        <a href="/" class="nav-link active">
+          <span>Dashboard</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="#" class="nav-link">
+          <span>Soil Analytics</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="#" class="nav-link">
+          <span>Weather Data</span>
+        </a>
+      </li>
+    </ul>
+    <div class="team-info" style="margin-top: auto; color: var(--text-dim); font-size: 0.8rem; text-align: center;">
+      <p></p>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header>
+      <h1>Crop Prediction Dashboard</h1>
+      <p class="subtitle">AI-powered agricultural analysis and recommendation system</p>
+    </header>
+
+    <section id="dashboard" class="dashboard-section active">
+      <section class="dashboard-grid">
+        <div class="stat-card">
+          <p class="stat-title">Total Samples</p>
+          <h2 class="stat-value">{{ stats.total_samples }}</h2>
+          <p class="stat-desc">Dataset richness</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-title">Unique Crops</p>
+          <h2 class="stat-value">{{ stats.unique_crops }}</h2>
+          <p class="stat-desc">Varieties covered</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-title">Current Status</p>
+          <h2 class="stat-value" id="current-status-val">{% if stats.current %}Input Active{% else %}Awaiting Input{%
+            endif %}</h2>
+          <p class="stat-desc">Real-time update</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-title">Avg Rainfall</p>
+          <h2 class="stat-value">{{ stats.avg_rain }}mm</h2>
+          <p class="stat-desc">Dataset average</p>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <div class="card prediction-card">
+          <div class="card-header">
+            <div class="icon-circle primary">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z" />
+              </svg>
+            </div>
+            <h3>Predict Optimal Crop</h3>
+          </div>
+          <form action="{{ url_for('predict')}}#dashboard" method="post" class="prediction-form">
+            <div class="input-grid">
+              <div class="input-group">
+                <label>Nitrogen (N)</label>
+                <input type="number" step="any" name="Nitrogen" placeholder="90"
+                  value="{{ stats.current.N if stats.current else '' }}" required>
+              </div>
+              <div class="input-group">
+                <label>Phosphorus (P)</label>
+                <input type="number" step="any" name="Phosphorus" placeholder="42"
+                  value="{{ stats.current.P if stats.current else '' }}" required>
+              </div>
+              <div class="input-group">
+                <label>Potassium (K)</label>
+                <input type="number" step="any" name="Potassium" placeholder="43"
+                  value="{{ stats.current.K if stats.current else '' }}" required>
+              </div>
+              <div class="input-group">
+                <label>Temp (°C)</label>
+                <input type="number" step="any" name="temperature" placeholder="20.8"
+                  value="{{ stats.current.temp if stats.current else '' }}" required>
+              </div>
+              <div class="input-group">
+                <label>Humidity (%)</label>
+                <input type="number" step="any" name="humidity" placeholder="82"
+                  value="{{ stats.current.hum if stats.current else '' }}" required>
+              </div>
+              <div class="input-group">
+                <label>pH Level</label>
+                <input type="number" step="any" name="pH" placeholder="6.5"
+                  value="{{ stats.current.ph if stats.current else '' }}" required>
+              </div>
+              <div class="input-group full-width">
+                <label>Rainfall (mm)</label>
+                <input type="number" step="any" name="rainfall" placeholder="202.9"
+                  value="{{ stats.current.rain if stats.current else '' }}" required>
+              </div>
+            </div>
+            <button type="submit" class="predict-btn">Analyze & Predict</button>
+          </form>
+
+          {% if prediction_text %}
+          <div class="result-area animate-fade-in">
+            <div class="prediction-label">Recommended Crop:</div>
+            <p id="prediction-result">{{ prediction }}</p>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="card chart-card">
+          <div class="card-header">
+            <div class="icon-circle accent">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                <path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.4 8.4H19V19h-3V13.4z" />
+              </svg>
+            </div>
+            <h3>Soil Composition Trends</h3>
+          </div>
+          <p class="chart-subtitle">{% if stats.current %}Comparison: Your Soil vs Optimal Averages{% else %}Average
+            Optimal Levels from Dataset{% endif %}</p>
+          <div style="height: 300px;">
+            <canvas id="soilChart"></canvas>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- Soil Analytics Section -->
+    <section id="soil_analytics" class="content-section">
+      <header>
+        <h2>Soil Analytics</h2>
+        <p class="subtitle">Detailed breakdown of chemical composition and soil health</p>
+      </header>
+      <div class="analytics-grid">
+        <div class="card">
+          <h4>Nutrient Distribution (NPK)</h4>
+          <div style="height: 300px;">
+            <canvas id="npkRadarChart"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Soil Health Indicators</h4>
+          {% set n_width = (stats.current.N / 150 * 100) if stats.current else (stats.avg_n / 150 * 100) %}
+          {% set p_width = (stats.current.P / 150 * 100) if stats.current else (stats.avg_p / 150 * 100) %}
+          {% set k_width = (stats.current.K / 250 * 100) if stats.current else (stats.avg_k / 250 * 100) %}
+          {% set ph_width = (stats.current.ph / 14 * 100) if stats.current else (stats.avg_ph / 14 * 100) %}
+          <div class="indicator-list">
+            <div class="indicator">
+              <span class="label">Nitrogen Level</span>
+              <div class="progress-bar">
+                <div class="fill" style="--w: {{ n_width }}%; width: var(--w);"></div>
+              </div>
+              <span class="val">{{ stats.current.N if stats.current else stats.avg_n }} mg/kg</span>
+            </div>
+            <div class="indicator">
+              <span class="label">Phosphorus Level</span>
+              <div class="progress-bar">
+                <div class="fill" style="--w: {{ p_width }}%; width: var(--w);"></div>
+              </div>
+              <span class="val">{{ stats.current.P if stats.current else stats.avg_p }} mg/kg</span>
+            </div>
+            <div class="indicator">
+              <span class="label">Potassium Level</span>
+              <div class="progress-bar">
+                <div class="fill" style="--w: {{ k_width }}%; width: var(--w);"></div>
+              </div>
+              <span class="val">{{ stats.current.K if stats.current else stats.avg_k }} mg/kg</span>
+            </div>
+            <div class="indicator">
+              <span class="label">pH Level</span>
+              <div class="progress-bar">
+                <div class="fill" style="--w: {{ ph_width }}%; width: var(--w); background: #a855f7;"></div>
+              </div>
+              <span class="val">{{ stats.current.ph if stats.current else stats.avg_ph }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Weather Data Section -->
+    <section id="weather_data" class="content-section">
+      <header>
+        <h2>Weather Insights</h2>
+        <p class="subtitle">Environmental parameters influencing crop selection</p>
+      </header>
+      <div class="weather-grid">
+        <div class="weather-card">
+          <div class="weather-icon">🌡️</div>
+          <p class="label">Temperature</p>
+          <h3>{{ stats.current.temp if stats.current else stats.avg_temp }}°C</h3>
+          <p class="status">{% if stats.current %}{{ 'Optimal' if 20 <= stats.current.temp <=30 else 'Extreme' }}{% else
+              %}Normal Range{% endif %}</p>
+        </div>
+        <div class="weather-card">
+          <div class="weather-icon">💧</div>
+          <p class="label">Humidity</p>
+          <h3>{{ stats.current.hum if stats.current else stats.avg_hum }}%</h3>
+          <p class="status">{% if stats.current %}{{ 'Optimal' if 60 <= stats.current.hum <=85 else 'Unstable' }}{% else
+              %}Normal Range{% endif %}</p>
+        </div>
+        <div class="weather-card">
+          <div class="weather-icon">🌧️</div>
+          <p class="label">Rainfall</p>
+          <h3>{{ stats.current.rain if stats.current else stats.avg_rain }}mm</h3>
+          <p class="status">{% if stats.current %}{{ 'Sufficient' if stats.current.rain >= 100 else 'Low' }}{% else
+            %}Avg Annual{% endif %}</p>
+        </div>
+      </div>
+    </section>
+
+    <footer class="team-section">
+      <div class="team-grid">
+        <span>Ahmad Yasin</span>
+        <span>Dawan Star</span>
+        <span>Pairaw Kamil</span>
+        <span>Zhir Jalal</span>
+      </div>
+    </footer>
+  </main>
+
+  <!-- Data for JavaScript charts -->
+  <div id="dashboard-data" data-n="{{ stats.avg_n }}" data-p="{{ stats.avg_p }}" data-k="{{ stats.avg_k }}"
+    data-ph="{{ stats.avg_ph }}" data-curr-n="{{ stats.current.N if stats.current else 0 }}"
+    data-curr-p="{{ stats.current.P if stats.current else 0 }}"
+    data-curr-k="{{ stats.current.K if stats.current else 0 }}"
+    data-curr-ph="{{ stats.current.ph if stats.current else 0 }}" style="display: none;">
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      // Sidebar Navigation
+      const navLinks = document.querySelectorAll('.nav-link');
+      const sections = document.querySelectorAll('.dashboard-section, .content-section');
+
+      navLinks.forEach(link => {
+        link.addEventListener('click', function (e) {
+          if (this.getAttribute('href') === '/') return; // Handle Home specifically
+
+          e.preventDefault();
+          const targetId = this.querySelector('span').textContent.toLowerCase().replace(' ', '_');
+
+          // Update active link
+          navLinks.forEach(l => l.classList.remove('active'));
+          this.classList.add('active');
+
+          // Show targeted section
+          sections.forEach(s => s.classList.remove('active'));
+          document.getElementById(targetId).classList.add('active');
+        });
+      });
+
+      // Charts
+      const ctx = document.getElementById('soilChart').getContext('2d');
+      const dataElement = document.getElementById('dashboard-data');
+
+      const avgData = [
+        parseFloat(dataElement.dataset.n),
+        parseFloat(dataElement.dataset.p),
+        parseFloat(dataElement.dataset.k),
+        parseFloat(dataElement.dataset.ph)
+      ];
+
+      const currData = [
+        parseFloat(dataElement.dataset.currN),
+        parseFloat(dataElement.dataset.currP),
+        parseFloat(dataElement.dataset.currK),
+        parseFloat(dataElement.dataset.currPh)
+      ];
+
+      const datasets = [{
+        label: 'Average Soil Levels',
+        data: avgData,
+        backgroundColor: 'rgba(56, 189, 248, 0.2)',
+        borderColor: '#38bdf8',
+        borderWidth: 2,
+        borderRadius: 8
+      }];
+
+      if (currData[0] > 0) {
+        datasets.unshift({
+          label: 'Your Input Levels',
+          data: currData,
+          backgroundColor: 'rgba(46, 204, 113, 0.6)',
+          borderColor: '#2ecc71',
+          borderWidth: 2,
+          borderRadius: 8
+        });
+      }
+
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Nitrogen', 'Phosphorus', 'Potassium', 'pH Level'],
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#94a3b8' }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#94a3b8' }
+            }
+          },
+          plugins: {
+            legend: {
+              display: true,
+              labels: { color: '#94a3b8' }
+            }
+          }
+        }
+      });
+
+      // Radar Chart for Soil Analytics
+      const radarCtx = document.getElementById('npkRadarChart').getContext('2d');
+      new Chart(radarCtx, {
+        type: 'radar',
+        data: {
+          labels: ['Nitrogen', 'Phosphorus', 'Potassium'],
+          datasets: [{
+            label: 'Your Soil',
+            data: [currData[0] || avgData[0], currData[1] || avgData[1], currData[2] || avgData[2]],
+            fill: true,
+            backgroundColor: 'rgba(46, 204, 113, 0.2)',
+            borderColor: '#2ecc71',
+            pointBackgroundColor: '#2ecc71',
+          }]
+        },
+        options: {
+          scales: {
+            r: {
+              angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+              grid: { color: 'rgba(255, 255, 255, 0.1)' },
+              pointLabels: { color: '#94a3b8' },
+              ticks: { display: false }
+            }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+
+      // Auto-switch to dashboard if prediction exists
+      if (document.getElementById('prediction-result')) {
+        const hash = window.location.hash;
+        if (hash) {
+          const target = document.querySelector(`a[href$="${hash}"]`);
+          if (target) target.click();
+        }
+      }
+    });
+  </script>
+</body>
+
+</html>
